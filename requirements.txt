@@ -1,0 +1,7 @@
+langchain-ollama
+langchain-core
+pyyaml
+imapclient
+caldav
+python-docx
+pymupdf
