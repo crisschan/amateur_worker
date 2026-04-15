@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 import yaml
+import requests
 from langchain_core.tools import tool
 
 if TYPE_CHECKING:
@@ -80,4 +84,141 @@ class SkillLoader:
                 return f"Skill '{name}' not found. Available: {available}"
             return info.get("_body", "(empty skill body)")
 
-        return [load_skill]
+        @tool
+        def search_skill(query: str) -> str:
+            """Search online skill repository for available skills.
+
+            Use this when you cannot complete a user's task with current capabilities.
+            Searches multiple sources including GitHub, skill repositories, and documentation.
+
+            Args:
+                query: Search keywords describing the required capability
+            """
+            if not loader._config.enable_skill_search:
+                return "Skill search is disabled in configuration"
+
+            try:
+                # Try primary skill repository first
+                try:
+                    resp = requests.get(
+                        f"{loader._config.skill_repository_url}/api/search",
+                        params={"q": query},
+                        timeout=10
+                    )
+                    resp.raise_for_status()
+                    results = resp.json()
+
+                    if results:
+                        lines = ["Found available skills in repository:"]
+                        for skill in results:
+                            lines.append(f"- {skill['name']}: {skill['description']}")
+                            lines.append(f"  Install URL: {skill['install_url']}")
+                            lines.append("")
+                        return "\n".join(lines)
+                except Exception:
+                    pass
+
+                # Fallback: search GitHub for skill implementations
+                try:
+                    gh_resp = requests.get(
+                        "https://api.github.com/search/repositories",
+                        params={
+                            "q": f"{query} skill in:name,description language:python",
+                            "sort": "stars",
+                            "order": "desc",
+                            "per_page": 5
+                        },
+                        timeout=10,
+                        headers={"Accept": "application/vnd.github.v3+json"}
+                    )
+                    gh_resp.raise_for_status()
+                    gh_results = gh_resp.json().get("items", [])
+
+                    if gh_results:
+                        lines = ["Found potential skill implementations on GitHub:"]
+                        for repo in gh_results:
+                            lines.append(f"- {repo['name']}: {repo['description'] or 'No description'}")
+                            lines.append(f"  Repository: {repo['html_url']}")
+                            lines.append(f"  Stars: {repo['stargazers_count']}")
+                            lines.append("")
+                        return "\n".join(lines)
+                except Exception:
+                    pass
+
+                return f"No matching skills found for '{query}'. Consider creating a new skill using the skill-creator tool."
+
+            except Exception as e:
+                return f"Skill search failed: {str(e)}"
+
+        @tool
+        def install_skill(url: str, confirm: bool = False) -> str:
+            """Install a skill from repository URL.
+            
+            Args:
+                url: Skill install URL from search results
+                confirm: Set to True to confirm installation after review
+            """
+            if not loader._config.enable_skill_search:
+                return "Skill installation is disabled in configuration"
+                
+            if not confirm:
+                return f"{{\"status\": \"pending_confirmation\", \"url\": \"{url}\"}}"
+                
+            try:
+                resp = requests.get(url, timeout=30)
+                resp.raise_for_status()
+                
+                with tempfile.NamedTemporaryFile(suffix='.zip', delete=False) as tmp:
+                    tmp.write(resp.content)
+                    tmp_path = Path(tmp.name)
+                
+                skills_dir = loader._config.skills_dir
+                skills_dir.mkdir(exist_ok=True)
+                
+                with zipfile.ZipFile(tmp_path, 'r') as zf:
+                    zf.extractall(skills_dir)
+                
+                tmp_path.unlink()
+                
+                # Rescan skills after install
+                loader._skills = _scan_skills(loader._config.skills_dir)
+                
+                return "Skill installed successfully and is now available"
+            except Exception as e:
+                return f"Skill installation failed: {str(e)}"
+
+        @tool
+        def create_skill(name: str, description: str, instructions: str) -> str:
+            """Create a new skill locally when no existing skill matches the requirement.
+
+            Args:
+                name: Skill name (lowercase, hyphen-separated)
+                description: One-line description of what the skill does
+                instructions: Full skill instructions and implementation details
+            """
+            try:
+                skills_dir = loader._config.skills_dir
+                skill_dir = skills_dir / name
+                skill_dir.mkdir(parents=True, exist_ok=True)
+
+                # Create SKILL.md with frontmatter
+                skill_md = skill_dir / "SKILL.md"
+                content = f"""---
+name: {name}
+description: {description}
+type: custom
+created: {__import__('datetime').datetime.now().isoformat()}
+---
+
+{instructions}
+"""
+                skill_md.write_text(content, encoding="utf-8")
+
+                # Rescan skills after creation
+                loader._skills = _scan_skills(loader._config.skills_dir)
+
+                return f"Skill '{name}' created successfully at {skill_dir}"
+            except Exception as e:
+                return f"Failed to create skill: {str(e)}"
+
+        return [load_skill, search_skill, install_skill, create_skill]

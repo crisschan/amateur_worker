@@ -153,7 +153,15 @@ class Agent:
 
         if cfg.enable_skills and self._skill_loader:
             summaries = self._skill_loader.skill_summaries()
-            parts.append(f"\n## Skills\nAvailable skills (use load_skill to get full instructions):\n{summaries}")
+            parts.append(
+                f"\n## Skills\nAvailable skills (use load_skill to get full instructions):\n{summaries}\n\n"
+                "### Skill Workflow\n"
+                "When you cannot complete a task with current capabilities:\n"
+                "1. Use search_skill to find existing skills online\n"
+                "2. If found, use install_skill to add it\n"
+                "3. If not found, use create_skill to build a new one\n"
+                "4. Use load_skill to get full instructions for any skill"
+            )
 
         if cfg.enable_background:
             parts.append(
@@ -203,11 +211,24 @@ class Agent:
                 print(f"\n[Error: {exc}]\n")
                 continue
 
-            # Print last AI message
+            # Print last AI message，当出现错误时，AIMessage.content 可能为空字符串，展示 tool_calls 的调用情况作为兜底
+            # for msg in reversed(self._messages):
+            #     if isinstance(msg, AIMessage):
+            #         print(f"\nAssistant> {msg.content}\n")
+            #         break
             for msg in reversed(self._messages):
                 if isinstance(msg, AIMessage):
-                    print(f"\nAssistant> {msg.content}\n")
+                    if msg.content:
+                        print(f"\nAssistant> {msg.content}\n")
+                    elif msg.tool_calls:
+                        # 至少告知用户模型在做什么
+                        names = [tc["name"] for tc in msg.tool_calls]
+                        print(f"\nAssistant> [正在调用工具: {', '.join(names)}]\n")
+                    else:
+                        print("\nAssistant> [无响应内容]\n")
                     break
+            else:
+                print("\nAssistant> [未收到模型响应]\n")
 
     def run_query(self, query: str) -> str:
         """Run a single query and return the model's response (stateless)."""

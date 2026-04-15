@@ -1,4 +1,4 @@
-# Software Design Document — Office Agent
+# Software Design Document — worker Agent
 
 **Version:** 1.0  
 **Date:** 2026-04-13  
@@ -8,7 +8,7 @@
 
 ## 1. Overview
 
-Office Agent 是一个交互式 AI 办公助手 CLI。它将本地 LLM（通过 Ollama）与一套工具连接起来，用于文件管理、邮件收发、日历调度、任务追踪和后台处理。用户在 REPL 中输入请求，Agent 进行推理、调用工具，并循环执行直到任务完成。
+worker Agent 是一个交互式 AI 办公助手 CLI。它将本地 LLM（通过 Ollama）与一套工具连接起来，用于文件管理、邮件收发、日历调度、任务追踪和后台处理。用户在 REPL 中输入请求，Agent 进行推理、调用工具，并循环执行直到任务完成。
 
 ### 1.1 Goals
 
@@ -118,7 +118,26 @@ Print final AIMessage to user
 - `transcripts_dir` → `workdir/.transcripts`
 
 **`AgentConfig.from_file(path)`** 从 `agent.json` 文件加载配置。文件中存在的键会覆盖 dataclass 默认值；未知键被静默忽略。路径字段（`workdir`、`workspace`）相对于配置文件所在目录解析。
+```
+__workdir主要用于__：
 
+- 定义代理程序的工作根目录
+- 构建系统目录路径（skills/、.tasks/、.transcripts/）
+- 作为workspace的默认值
+
+__workspace主要用于__：
+
+- 文档操作的安全边界
+- 所有文件操作的安全性验证
+- 防止路径遍历攻击
+
+__关键区别__：
+
+- workdir是系统级配置，影响整个代理程序的运行环境
+- workspace是文件操作的安全边界，保护文件系统安全
+- 当workspace为None时，使用workdir作为默认工作空间
+
+```
 示例 `agent.json`：
 ```json
 {

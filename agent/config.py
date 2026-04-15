@@ -20,7 +20,7 @@ class AgentConfig:
     max_tokens: int = 4096
 
     # Paths
-    workdir: Path = field(default_factory=Path.cwd)
+    workdir: Path = field(default_factory=lambda: Path(os.path.abspath('.')))
     workspace: Optional[Path] = None
 
     # Context management
@@ -34,9 +34,13 @@ class AgentConfig:
     enable_email: bool = True
     enable_calendar: bool = True
     enable_skills: bool = True
+    enable_skill_search: bool = True
     enable_background: bool = True
     enable_subagent: bool = True
     enable_compact: bool = True
+    
+    # Skill repository
+    skill_repository_url: str = field(default_factory=lambda: os.environ.get("SKILL_REPOSITORY", "https://clawhub.ai"))
 
     # Email
     email_host: Optional[str] = field(default_factory=lambda: os.environ.get("EMAIL_HOST"))
