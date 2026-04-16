@@ -51,20 +51,8 @@ class Agent:
             from agent.tools.tasks import create_task_tools
             tools += create_task_tools(cfg)
 
-        if cfg.enable_email:
-            try:
-                from agent.tools.email import create_email_tools
-                tools += create_email_tools(cfg)
-            except Exception as exc:
-                print(f"[warning] Email tools disabled: {exc}", file=sys.stderr)
-
-        if cfg.enable_calendar:
-            try:
-                from agent.tools.calendar import create_calendar_tools
-                tools += create_calendar_tools(cfg)
-            except Exception as exc:
-                print(f"[warning] Calendar tools disabled: {exc}", file=sys.stderr)
-
+        
+        
         if cfg.enable_skills:
             self._skill_loader = SkillLoader(cfg)
             tools += self._skill_loader.create_tools()
@@ -138,27 +126,23 @@ class Agent:
                 "for long-lived tasks that should survive session restarts."
             )
 
-        if cfg.enable_email:
-            parts.append(
-                "\n## Email\nUse email_list, email_read, email_search to handle mail. "
-                "ALWAYS call email_send or email_reply with confirm=False first, show the draft "
-                "to the user, and only call with confirm=True after explicit confirmation."
-            )
-
-        if cfg.enable_calendar:
-            parts.append(
-                "\n## Calendar\nUse calendar_list, calendar_get, calendar_create, calendar_update, "
-                "calendar_find_slot for scheduling. Always confirm before calling calendar_delete."
-            )
-
+        
+        
         if cfg.enable_skills and self._skill_loader:
             summaries = self._skill_loader.skill_summaries()
-            parts.append(f"\n## Skills\nAvailable skills (use load_skill to get full instructions):\n{summaries}")
+            parts.append(
+                f"\n## Skills\nAvailable skills (use load_skill to get full instructions):\n{summaries}\n\n"
+                "### Skill Workflow\n"
+                "When you cannot complete a task with current capabilities:\n"
+                "1. Use search_skill to find existing skills online\n"
+                "2. If found, use install_skill to add it\n"
+                "3. If not found, use create_skill to build a new one\n"
+                "4. Use load_skill to get full instructions for any skill"
+            )
 
         if cfg.enable_background:
             parts.append(
                 "\n## Background Tasks\nUse background_run for long operations "
-                "(email_batch_send, email_export, doc_export, calendar_sync). "
                 "Check status with check_background."
             )
 
@@ -183,7 +167,8 @@ class Agent:
         print(f"Office Agent ready (model: {self._config.model}). Type 'exit' or Ctrl-C to quit.\n")
         while True:
             try:
-                user_input = input("You> ").strip()
+                user_input = input(f"\033[36m Amateur >> \033[0m")
+                user_input = user_input.strip()
             except (KeyboardInterrupt, EOFError):
                 print("\nGoodbye.")
                 break
@@ -203,11 +188,24 @@ class Agent:
                 print(f"\n[Error: {exc}]\n")
                 continue
 
-            # Print last AI message
+            # Print last AI message，当出现错误时，AIMessage.content 可能为空字符串，展示 tool_calls 的调用情况作为兜底
+            # for msg in reversed(self._messages):
+            #     if isinstance(msg, AIMessage):
+            #         print(f"\nAssistant> {msg.content}\n")
+            #         break
             for msg in reversed(self._messages):
                 if isinstance(msg, AIMessage):
-                    print(f"\nAssistant> {msg.content}\n")
+                    if msg.content:
+                        print(f"\nAssistant> {msg.content}\n")
+                    elif msg.tool_calls:
+                        # 至少告知用户模型在做什么
+                        names = [tc["name"] for tc in msg.tool_calls]
+                        print(f"\nAssistant> [正在调用工具: {', '.join(names)}]\n")
+                    else:
+                        print("\nAssistant> [无响应内容]\n")
                     break
+            else:
+                print("\nAssistant> [未收到模型响应]\n")
 
     def run_query(self, query: str) -> str:
         """Run a single query and return the model's response (stateless)."""

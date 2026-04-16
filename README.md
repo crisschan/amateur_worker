@@ -14,7 +14,6 @@
 | 📄 **文档管理** | 读取/写入/编辑文档，支持 TXT/MD/DOCX/PDF 格式，路径安全隔离 |
 | 📧 **邮件管理** | IMAP/SMTP 邮件收发，两阶段确认发送，搜索与回复 |
 | 📅 **日历管理** | CalDAV 日程管理，事件创建/更新/删除，空闲时段查找 |
-| ✅ **待办事项** | 内存级待办列表，自动提醒机制 |
 | 📋 **任务管理** | 持久化任务存储，依赖图管理 |
 | ⚙️ **后台执行** | 守护线程异步执行耗时操作，不阻塞交互 |
 | 🧠 **子 Agent** | 子任务委派，上下文隔离并行处理 |
@@ -61,12 +60,19 @@ python main.py --config agent.json
 
 ### 配置文件 `agent.json`
 
+
+- workdir主要用于：定义代理程序的工作根目录；构建系统目录路径（skills/、.tasks/、.transcripts/；作为workspace的默认值
+
+- workspace主要用于：文档操作的安全边界；所有文件操作的安全性验证；防止路径遍历攻击
+
+- 关键区别：workdir是系统级配置，影响整个代理程序的运行环境；workspace是文件操作的安全边界，保护文件系统安全；当workspace为None时，使用workdir作为默认工作空间。
+
 ```json
 {
   "model": "qwen2.5",
   "base_url": "http://localhost:11434",
   "workdir": ".",
-  "workspace": "./documents",
+  "workspace": ".",
   "temperature": 0.2,
   
   "enable_todo": true,
@@ -86,10 +92,6 @@ python main.py --config agent.json
 |------|------|
 | `OLLAMA_MODEL` | 默认 Ollama 模型名称 |
 | `OLLAMA_BASE_URL` | Ollama 服务地址 |
-| `EMAIL_HOST` | IMAP/SMTP 服务器地址 |
-| `EMAIL_USER` | 邮件账户用户名 |
-| `EMAIL_PASSWORD` | 邮件账户密码 |
-| `CALDAV_URL` | CalDAV 服务器 URL |
 
 ```
 export EMAIL_HOST=imap.yourprovider.com

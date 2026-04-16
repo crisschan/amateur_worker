@@ -1,7 +1,7 @@
 {
   "model": "kimi-k2.5:cloud",
   "workdir": ".",
-  "workspace": "./documents",
+  "workspace": ".",
   "temperature": 0.2,
   "max_tokens": 4096,
   "context_threshold": 50000,
@@ -9,8 +9,6 @@
   "todo_nag_interval": 3,
   "enable_todo": true,
   "enable_tasks": true,
-  "enable_email": false,
-  "enable_calendar": false,
   "enable_skills": true,
   "enable_background": false,
   "enable_subagent": true,

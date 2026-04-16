@@ -43,16 +43,24 @@ def main() -> None:
     # ── Load config ───────────────────────────────────────────────────────────
     from agent.config import AgentConfig, ConfigError
 
-    # Auto-detect agent.json in cwd
-    config_path = args.config or (Path.cwd() / "agent.json")
-    if Path(config_path).exists():
-        try:
-            cfg = AgentConfig.from_file(config_path)
-        except ConfigError as exc:
-            print(f"Error loading config: {exc}", file=sys.stderr)
-            sys.exit(1)
-    else:
-        cfg = AgentConfig()
+    # Auto-detect agent.json in cwd, handle permission issues gracefully
+    cfg = AgentConfig()
+    try:
+        if args.config:
+            config_path = Path(args.config)
+            if config_path.exists():
+                cfg = AgentConfig.from_file(config_path)
+        else:
+            try:
+                config_path = Path.cwd() / "agent.json"
+                if config_path.exists():
+                    cfg = AgentConfig.from_file(config_path)
+            except Exception:
+                # Skip auto config detection if cwd not accessible
+                pass
+    except ConfigError as exc:
+        print(f"Error loading config: {exc}", file=sys.stderr)
+        sys.exit(1)
 
     # ── Apply CLI overrides ───────────────────────────────────────────────────
     if args.model:
