@@ -51,20 +51,8 @@ class Agent:
             from agent.tools.tasks import create_task_tools
             tools += create_task_tools(cfg)
 
-        if cfg.enable_email:
-            try:
-                from agent.tools.email import create_email_tools
-                tools += create_email_tools(cfg)
-            except Exception as exc:
-                print(f"[warning] Email tools disabled: {exc}", file=sys.stderr)
-
-        if cfg.enable_calendar:
-            try:
-                from agent.tools.calendar import create_calendar_tools
-                tools += create_calendar_tools(cfg)
-            except Exception as exc:
-                print(f"[warning] Calendar tools disabled: {exc}", file=sys.stderr)
-
+        
+        
         if cfg.enable_skills:
             self._skill_loader = SkillLoader(cfg)
             tools += self._skill_loader.create_tools()
@@ -138,19 +126,8 @@ class Agent:
                 "for long-lived tasks that should survive session restarts."
             )
 
-        if cfg.enable_email:
-            parts.append(
-                "\n## Email\nUse email_list, email_read, email_search to handle mail. "
-                "ALWAYS call email_send or email_reply with confirm=False first, show the draft "
-                "to the user, and only call with confirm=True after explicit confirmation."
-            )
-
-        if cfg.enable_calendar:
-            parts.append(
-                "\n## Calendar\nUse calendar_list, calendar_get, calendar_create, calendar_update, "
-                "calendar_find_slot for scheduling. Always confirm before calling calendar_delete."
-            )
-
+        
+        
         if cfg.enable_skills and self._skill_loader:
             summaries = self._skill_loader.skill_summaries()
             parts.append(
@@ -166,7 +143,6 @@ class Agent:
         if cfg.enable_background:
             parts.append(
                 "\n## Background Tasks\nUse background_run for long operations "
-                "(email_batch_send, email_export, doc_export, calendar_sync). "
                 "Check status with check_background."
             )
 
@@ -191,7 +167,8 @@ class Agent:
         print(f"Office Agent ready (model: {self._config.model}). Type 'exit' or Ctrl-C to quit.\n")
         while True:
             try:
-                user_input = input("You> ").strip()
+                user_input = input(f"\033[36m Amateur >> \033[0m")
+                user_input = user_input.strip()
             except (KeyboardInterrupt, EOFError):
                 print("\nGoodbye.")
                 break
