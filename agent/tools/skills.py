@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
+import re
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -221,4 +224,42 @@ created: {__import__('datetime').datetime.now().isoformat()}
             except Exception as e:
                 return f"Failed to create skill: {str(e)}"
 
-        return [load_skill, search_skill, install_skill, create_skill]
+        @tool
+        def run_skill(name: str, code: str) -> str:
+            """Execute Python code extracted from a skill's instructions.
+
+            Use this after load_skill to actually run the skill's code and return
+            real output. Do NOT write a standalone script file — call this instead.
+
+            Args:
+                name: The skill name (for logging only).
+                code: Complete, self-contained Python code to execute.
+            """
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".py", delete=False, encoding="utf-8"
+            ) as tmp:
+                tmp.write(code)
+                tmp_path = tmp.name
+            try:
+                result = subprocess.run(
+                    ["python3", tmp_path],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                )
+                output = result.stdout.strip()
+                error = result.stderr.strip()
+                if result.returncode != 0:
+                    return f"[skill:{name}] 执行出错:\n{error}" + (f"\n{output}" if output else "")
+                return output or f"[skill:{name}] 执行完成（无输出）"
+            except subprocess.TimeoutExpired:
+                return f"[skill:{name}] 执行超时（30s）"
+            except Exception as exc:
+                return f"[skill:{name}] 执行失败: {exc}"
+            finally:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+        return [load_skill, run_skill, search_skill, install_skill, create_skill]
