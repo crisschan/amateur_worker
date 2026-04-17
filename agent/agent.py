@@ -3,7 +3,7 @@ from __future__ import annotations
 import sys
 from typing import Optional
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_ollama import ChatOllama
 
 from agent.config import AgentConfig
@@ -132,12 +132,13 @@ class Agent:
             summaries = self._skill_loader.skill_summaries()
             parts.append(
                 f"\n## Skills\nAvailable skills (use load_skill to get full instructions):\n{summaries}\n\n"
-                "### Skill Workflow\n"
-                "When you cannot complete a task with current capabilities:\n"
-                "1. Use search_skill to find existing skills online\n"
-                "2. If found, use install_skill to add it\n"
-                "3. If not found, use create_skill to build a new one\n"
-                "4. Use load_skill to get full instructions for any skill"
+                "### Skill Workflow — MANDATORY\n"
+                "**ALWAYS follow this order. No exceptions.**\n"
+                "1. Check the skill list above for a match to the user's request\n"
+                "2. If a match exists → call load_skill, then run_skill with the code block from the instructions\n"
+                "3. Only if NO skill matches → use search_skill, install_skill, or create_skill\n\n"
+                "**NEVER write a standalone .py file to do something a skill already covers.**\n"
+                "**NEVER use write_document to save a script instead of calling run_skill.**"
             )
 
         if cfg.enable_background:
@@ -202,7 +203,13 @@ class Agent:
                         names = [tc["name"] for tc in msg.tool_calls]
                         print(f"\nAssistant> [正在调用工具: {', '.join(names)}]\n")
                     else:
-                        print("\nAssistant> [无响应内容]\n")
+                        # 模型完成工具调用后未返回文字，回溯找最近的工具执行结果展示
+                        for prev in reversed(self._messages):
+                            if isinstance(prev, ToolMessage) and prev.content:
+                                print(f"\nAssistant> [任务已完成] {prev.content}\n")
+                                break
+                        else:
+                            print("\nAssistant> [任务已完成]\n")
                     break
             else:
                 print("\nAssistant> [未收到模型响应]\n")
